@@ -33,6 +33,12 @@ Automated GitHub Action that syncs meditation data between Beeminder goals.
 3. **Meditation Detection:** Checks the source goal for qualifying meditations
 4. **Automatic Updates:** Adds qualifying meditations as +1 datapoints
 
+## Goal Status
+
+View the real-time status of the Beeminder goals:
+- **Source Goal (meditation tracking):** https://www.beeminder.com/zarathustra/meditatev4
+- **Target Goal (early meditation tracking):** https://www.beeminder.com/zarathustra/meditate-early
+
 ## Manual Testing
 
 Run locally with:
