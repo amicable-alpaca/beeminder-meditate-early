@@ -32,6 +32,7 @@ jobs:
         BEEMINDER_USERNAME: ${{ secrets.BEEMINDER_USERNAME }}
         BEEMINDER_AUTH_TOKEN: ${{ secrets.BEEMINDER_AUTH_TOKEN }}
         BEEMINDER_GOAL_SLUG: ${{ secrets.BEEMINDER_GOAL_SLUG }}
+        BEEMINDER_SOURCE_GOAL_SLUG: ${{ secrets.BEEMINDER_SOURCE_GOAL_SLUG }}
       run: python scripts/beeminder_sync.py
 
     - name: Commit and push database changes

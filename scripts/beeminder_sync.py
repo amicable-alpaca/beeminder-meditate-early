@@ -29,7 +29,7 @@ load_env()
 BEEMINDER_USERNAME = os.getenv('BEEMINDER_USERNAME', 'zarathustra')
 BEEMINDER_AUTH_TOKEN = os.getenv('BEEMINDER_AUTH_TOKEN')
 BEEMINDER_GOAL_SLUG = os.getenv('BEEMINDER_GOAL_SLUG', 'meditate-early')
-BEEMINDER_SOURCE_GOAL = 'meditatev4'
+BEEMINDER_SOURCE_GOAL = os.getenv('BEEMINDER_SOURCE_GOAL_SLUG', 'meditatev4')
 
 # Database configuration
 DB_PATH = Path('data/meditation_sot.json')

@@ -18,6 +18,7 @@ Automated GitHub Action that syncs meditation data between Beeminder goals.
    - `BEEMINDER_USERNAME`: Your Beeminder username
    - `BEEMINDER_AUTH_TOKEN`: Your Beeminder auth token
    - `BEEMINDER_GOAL_SLUG`: Target goal slug (e.g., "meditate-early")
+   - `BEEMINDER_SOURCE_GOAL_SLUG`: Source goal slug (e.g., "meditatev4")
 
 3. **Enable GitHub Actions:**
    Go to the Actions tab and enable workflows
@@ -29,7 +30,7 @@ Automated GitHub Action that syncs meditation data between Beeminder goals.
 
 1. **Database Management:** Creates/maintains a JSON database in `data/meditation_sot.json`
 2. **Data Sync:** Ensures the Beeminder goal matches the local database exactly
-3. **Meditation Detection:** Checks the `meditatev4` goal for qualifying meditations
+3. **Meditation Detection:** Checks the source goal for qualifying meditations
 4. **Automatic Updates:** Adds qualifying meditations as +1 datapoints
 
 ## Manual Testing
