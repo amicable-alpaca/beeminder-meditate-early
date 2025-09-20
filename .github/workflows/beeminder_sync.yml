@@ -1,0 +1,43 @@
+name: Beeminder Meditation Sync
+
+"on":
+  schedule:
+    # Runs at 8:35 AM ET (Eastern Time)
+    # GitHub Actions uses UTC, so we need to adjust
+    # 8:35 AM ET = 13:35 UTC (standard time) or 12:35 UTC (daylight saving)
+    - cron: '35 12 * * *'  # During EDT (Mar-Nov)
+    - cron: '35 13 * * *'  # During EST (Nov-Mar)
+  workflow_dispatch:  # Allows manual triggering for testing
+
+jobs:
+  sync-beeminder:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run Beeminder sync
+      env:
+        BEEMINDER_USERNAME: ${{ secrets.BEEMINDER_USERNAME }}
+        BEEMINDER_AUTH_TOKEN: ${{ secrets.BEEMINDER_AUTH_TOKEN }}
+        BEEMINDER_GOAL_SLUG: ${{ secrets.BEEMINDER_GOAL_SLUG }}
+      run: python scripts/beeminder_sync.py
+
+    - name: Commit and push database changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add data/meditation_sot.json
+        git diff --quiet && git diff --staged --quiet || git commit -m "Update meditation database [skip ci]"
+        git push
