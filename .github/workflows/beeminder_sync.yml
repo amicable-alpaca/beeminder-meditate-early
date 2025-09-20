@@ -12,6 +12,8 @@ name: Beeminder Meditation Sync
 jobs:
   sync-beeminder:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
     - name: Checkout repository
