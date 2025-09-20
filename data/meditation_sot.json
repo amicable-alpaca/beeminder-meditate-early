@@ -1,4 +1,11 @@
 {
-  "datapoints": [],
+  "datapoints": [
+    {
+      "value": 0,
+      "timestamp": 1758340800,
+      "comment": "Initial baseline for 2025-09-20",
+      "id": "local_1758340800_0"
+    }
+  ],
   "last_updated": "2025-09-20T15:52:28.389504+00:00"
 }
