@@ -46,17 +46,42 @@ class BeeminderAPI:
         self.base_url = 'https://www.beeminder.com/api/v1'
 
     def get_goal_data(self, goal_slug: str) -> List[Dict]:
-        """Get all datapoints for a specific goal"""
-        url = f"{self.base_url}/users/{self.username}/goals/{goal_slug}/datapoints.json"
-        params = {'auth_token': self.auth_token}
+        """Get all datapoints for a specific goal with pagination support"""
+        all_datapoints = []
+        page = 1
+        per_page = 300  # Maximum allowed by Beeminder API
 
-        try:
-            response = requests.get(url, params=params)
-            response.raise_for_status()
-            return response.json()
-        except requests.exceptions.RequestException as e:
-            print(f"Error fetching goal data for {goal_slug}: {e}")
-            return []
+        while True:
+            url = f"{self.base_url}/users/{self.username}/goals/{goal_slug}/datapoints.json"
+            params = {
+                'auth_token': self.auth_token,
+                'page': page,
+                'per_page': per_page
+            }
+
+            try:
+                response = requests.get(url, params=params)
+                response.raise_for_status()
+                page_data = response.json()
+
+                if not page_data:  # No more data
+                    break
+
+                all_datapoints.extend(page_data)
+
+                # If we got less than per_page, we're done
+                if len(page_data) < per_page:
+                    break
+
+                page += 1
+                print(f"Fetched page {page-1} for {goal_slug}: {len(page_data)} datapoints")
+
+            except requests.exceptions.RequestException as e:
+                print(f"Error fetching goal data for {goal_slug} (page {page}): {e}")
+                break
+
+        print(f"Total datapoints fetched for {goal_slug}: {len(all_datapoints)}")
+        return all_datapoints
 
     def add_datapoint(self, goal_slug: str, value: float, timestamp: int, comment: str = "") -> bool:
         """Add a datapoint to a goal"""
