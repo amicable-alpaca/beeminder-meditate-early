@@ -7,6 +7,7 @@ Syncs meditation data between Beeminder goals and a local source of truth databa
 import os
 import json
 import requests
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -170,6 +171,47 @@ class MeditationDatabase:
                 return True
         return False
 
+def extract_actual_time_from_apple_health(datapoint: Dict) -> Optional[datetime]:
+    """
+    Extract the actual entry time from Apple Health datapoints using the fulltext field.
+    Apple Health entries have incorrect timestamps but correct entry times in fulltext.
+
+    Example fulltext: "2025-Sep-26 entered at 07:21 by zarathustra via BeemiOS"
+    """
+    if datapoint.get('comment') != 'Auto-entered via Apple Health':
+        return None
+
+    fulltext = datapoint.get('fulltext', '')
+
+    # Pattern to match: "YYYY-Mon-DD entered at HH:MM"
+    pattern = r'(\d{4})-([A-Za-z]{3})-(\d{2}) entered at (\d{2}):(\d{2})'
+    match = re.search(pattern, fulltext)
+
+    if not match:
+        return None
+
+    year, month_str, day, hour, minute = match.groups()
+
+    # Convert month abbreviation to number
+    month_map = {
+        'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
+        'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
+    }
+
+    month = month_map.get(month_str)
+    if not month:
+        return None
+
+    try:
+        # Create datetime in NYC timezone
+        actual_time = datetime(
+            int(year), month, int(day), int(hour), int(minute),
+            tzinfo=NYC_TZ
+        )
+        return actual_time
+    except ValueError:
+        return None
+
 def sync_beeminder_with_database(api: BeeminderAPI, db: MeditationDatabase, goal_slug: str):
     """Sync Beeminder goal with local database"""
     print(f"\nSyncing {goal_slug} with local database...")
@@ -210,54 +252,83 @@ def check_and_add_qualifying_meditation(api: BeeminderAPI, db: MeditationDatabas
     """Check meditatev4 goal for qualifying meditations and add them if found"""
     print(f"\nChecking {BEEMINDER_SOURCE_GOAL} for qualifying meditations...")
 
-    # Get current NYC time
-    nyc_now = datetime.now(NYC_TZ)
-    today_5am = nyc_now.replace(hour=5, minute=0, second=0, microsecond=0)
-    today_830am = nyc_now.replace(hour=8, minute=30, second=0, microsecond=0)
-
     # Get meditation data from source goal
     meditation_data = api.get_goal_data(BEEMINDER_SOURCE_GOAL)
+    print(f"Found {len(meditation_data)} total meditation entries")
+
+    # Group qualifying meditations by date (one per day)
+    qualifying_by_date = {}
 
     for datapoint in meditation_data:
-        # Convert timestamp to NYC time
-        meditation_time = datetime.fromtimestamp(datapoint['timestamp'], tz=NYC_TZ)
-        meditation_date = meditation_time.date()
-        today_date = nyc_now.date()
+        # For Apple Health entries, extract the actual entry time from fulltext
+        actual_time = extract_actual_time_from_apple_health(datapoint)
 
-        # Check if meditation is from today
-        if meditation_date != today_date:
-            continue
+        if actual_time:
+            # Use the parsed time from Apple Health
+            meditation_time = actual_time
+            print(f"Apple Health entry: {datapoint['value']} min, actual time: {meditation_time}")
+        else:
+            # Use the timestamp for non-Apple Health entries
+            meditation_time = datetime.fromtimestamp(datapoint['timestamp'], tz=NYC_TZ)
+            print(f"Regular entry: {datapoint['value']} min at {meditation_time}")
+
+        meditation_date = meditation_time.date()
+
+        # Define 5 AM and 8:30 AM for this specific date
+        day_5am = meditation_time.replace(hour=5, minute=0, second=0, microsecond=0)
+        day_830am = meditation_time.replace(hour=8, minute=30, second=0, microsecond=0)
 
         # Check if meditation was between 5 AM and 8:30 AM
-        if not (today_5am <= meditation_time <= today_830am):
+        if not (day_5am <= meditation_time <= day_830am):
+            print(f"  → Not in qualifying time window (5:00-8:30 AM)")
             continue
 
         # Check if meditation is at least 35 minutes
         if datapoint['value'] < 35:
+            print(f"  → Too short ({datapoint['value']} < 35 minutes)")
             continue
 
         # Check if we've already recorded this meditation
         if db.datapoint_exists(datapoint['timestamp'], 1):
-            print(f"Qualifying meditation already recorded: {meditation_time}")
+            print(f"  → Already recorded: {meditation_time}")
             continue
 
-        # Add qualifying meditation to database and goal
-        print(f"Found qualifying meditation: {datapoint['value']} minutes at {meditation_time}")
+        print(f"  → ✓ QUALIFYING: {datapoint['value']} minutes at {meditation_time}")
+
+        # Store the best (longest) qualifying meditation for each date
+        if meditation_date not in qualifying_by_date or datapoint['value'] > qualifying_by_date[meditation_date]['datapoint']['value']:
+            qualifying_by_date[meditation_date] = {
+                'datapoint': datapoint,
+                'actual_time': meditation_time
+            }
+
+    # Add all qualifying meditations
+    added_count = 0
+    for meditation_date, data in qualifying_by_date.items():
+        datapoint = data['datapoint']
+        meditation_time = data['actual_time']
+
+        print(f"\nAdding qualifying meditation: {datapoint['value']} minutes at {meditation_time}")
         comment = f"Early meditation: {datapoint['value']} minutes at {meditation_time.strftime('%H:%M')}"
 
         # Add to local database
         db.add_datapoint(1, datapoint['timestamp'], comment)
 
         # Add to Beeminder goal
-        api.add_datapoint(BEEMINDER_GOAL_SLUG, 1, datapoint['timestamp'], comment)
+        success = api.add_datapoint(BEEMINDER_GOAL_SLUG, 1, datapoint['timestamp'], comment)
 
-        print(f"Added qualifying meditation to database and {BEEMINDER_GOAL_SLUG}")
+        if success:
+            print(f"✓ Added to database and {BEEMINDER_GOAL_SLUG}")
+            added_count += 1
+            # Save database after adding
+            db.save()
+        else:
+            print(f"✗ Failed to add to {BEEMINDER_GOAL_SLUG}")
 
-        # Save database after adding
-        db.save()
-
-        # Only count one qualifying meditation per day
-        break
+    if added_count == 0:
+        print("No new qualifying meditations found")
+    else:
+        print(f"\nAdded {added_count} qualifying meditation(s)")
 
 def main():
     """Main execution function"""
