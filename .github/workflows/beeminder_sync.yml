@@ -1,13 +1,13 @@
 name: Beeminder Meditation Sync
 
-"on":
-  schedule:
+#"on":
+#  schedule:
     # Runs at 8:35 AM ET (Eastern Time)
     # GitHub Actions uses UTC, so we need to adjust
     # 8:35 AM ET = 13:35 UTC (standard time) or 12:35 UTC (daylight saving)
-    - cron: '35 12 * * *'  # During EDT (Mar-Nov)
-    - cron: '35 13 * * *'  # During EST (Nov-Mar)
-  workflow_dispatch:  # Allows manual triggering for testing
+#    - cron: '35 12 * * *'  # During EDT (Mar-Nov)
+#    - cron: '35 13 * * *'  # During EST (Nov-Mar)
+#  workflow_dispatch:  # Allows manual triggering for testing
 
 jobs:
   sync-beeminder:
